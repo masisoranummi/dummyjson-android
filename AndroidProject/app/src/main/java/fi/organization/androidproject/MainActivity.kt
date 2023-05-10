@@ -1,29 +1,43 @@
 package fi.organization.androidproject
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Button
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.ProgressIndicatorDefaults
-import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import coil.compose.AsyncImage
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -46,7 +60,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            UserList()
+            Column{
+                SearchPopUp()
+                UserList()
+            }
         }
     }
 
@@ -75,12 +92,14 @@ class MainActivity : ComponentActivity() {
             runOnUiThread {
                 setDone(true)
             }
+
         }
     }
 
 
     @Composable
     fun UserList() {
+
         val (done, setDone) = remember { mutableStateOf(false) }
         val (userList, setUserList) = remember { mutableStateOf(emptyList<Person>()) }
 
@@ -92,7 +111,7 @@ class MainActivity : ComponentActivity() {
             if (done) {
                 LazyColumn() {
                     items(userList) { user ->
-                        MessageCard(person = user)
+                        UserCard(person = user)
                     }
                 }
             } else {
@@ -106,10 +125,106 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
+@Composable
+fun SearchPopUp(){
+    var textFieldSize by remember { mutableStateOf(Size.Zero)}
+    val (popup, setPopup) = remember { mutableStateOf(false) }
+    val options = listOf("First name", "Last name", "Age", "Gender")
+    var expanded by remember { mutableStateOf(false) }
+    var selectedOptionText by remember { mutableStateOf(options[0]) }
+    var searchText by remember { mutableStateOf("") }
 
+    val icon = if (expanded)
+        Icons.Filled.KeyboardArrowUp
+    else
+        Icons.Filled.KeyboardArrowDown
+
+    SimpleButton(buttonText = "Search users") {
+       setPopup(true)
+    }
+
+    if (popup) {
+        Popup(
+            alignment = Alignment.Center,
+            onDismissRequest = { setPopup(false) },
+            properties = PopupProperties(dismissOnBackPress = true)
+        ) {
+            Column(modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .height(225.dp)
+                .background(color = Color.White)
+                .border(width = 3.dp, color = Color.Black, shape = RoundedCornerShape(8.dp))) {
+
+                // Create an Outlined Text Field
+                // with icon and not expanded
+                OutlinedTextField(
+                    value = selectedOptionText,
+                    readOnly = true,
+                    onValueChange = {  },
+                    modifier = Modifier
+                        .padding(PaddingValues(top = 10.dp))
+                        .fillMaxWidth(0.9f)
+                        .align(Alignment.CenterHorizontally)
+                        .onGloballyPositioned { coordinates ->
+                            textFieldSize = coordinates.size.toSize()
+                        },
+                    label = {Text("Search options")},
+                    trailingIcon = {
+                        Icon(icon,"contentDescription",
+                            Modifier.clickable { expanded = !expanded })
+                    }
+                )
+
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier
+                        .width(with(LocalDensity.current){textFieldSize.width.toDp()})
+                ) {
+                    options.forEach { label ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 50.dp)
+                        ) {
+                            DropdownMenuItem(onClick = {
+                                selectedOptionText = label
+                                expanded = false
+                            }) {
+                                Text(text = label)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+/*
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .align(Alignment.CenterHorizontally),
+                    label = {Text(selectedOptionText)},
+                )
+ */
+
+                TextField(value = searchText, onValueChange = {searchText = it}, modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .align(Alignment.CenterHorizontally))
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                SimpleButton(buttonText = "Start search", offset = 0.9f) {
+                    println("$searchText from $selectedOptionText")
+                }
+            }
+        }
+    }
+}
 
 @Composable
-fun MessageCard(person: Person) {
+fun UserCard(person: Person) {
     Row(modifier = Modifier
         .padding(all = 10.dp)
         .border(width = 3.dp, color = Color.Black, shape = RoundedCornerShape(8.dp))
@@ -120,7 +235,9 @@ fun MessageCard(person: Person) {
         AsyncImage(
             model = person.image,
             contentDescription = null,
-            modifier = Modifier.clip(CircleShape).size(70.dp)
+            modifier = Modifier
+                .clip(CircleShape)
+                .size(70.dp)
         )
         Column(verticalArrangement = Arrangement.Center, modifier = Modifier.height(80.dp)) {
             person.firstName?.let { Text(text = it) }
@@ -139,8 +256,11 @@ fun MessageCard(person: Person) {
 
 
 @Composable
-fun SimpleButton(buttonText: String, onButtonClick: () -> Unit) {
-    Button(onClick = onButtonClick) {
+fun SimpleButton(buttonText: String, offset: Float = 1.0f, onButtonClick: () -> Unit) {
+    Button(onClick = onButtonClick, modifier = Modifier
+        .padding(start = 16.dp * offset, end = 16.dp)
+        .fillMaxWidth())
+    {
         Text(text = buttonText)
     }
 }
