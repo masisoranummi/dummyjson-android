@@ -1,6 +1,8 @@
 package fi.organization.androidproject
 
+import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,14 +25,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
@@ -45,6 +52,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URL
 import kotlin.concurrent.thread
+import kotlin.math.exp
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -61,9 +69,31 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             Column{
-                SearchPopUp()
-                UserList()
+                MyScreen()
             }
+        }
+    }
+
+    @Composable
+    fun MyScreen() {
+        val (done, setDone) = remember { mutableStateOf(false) }
+        val (userList, setUserList) = remember { mutableStateOf(emptyList<Person>()) }
+        SearchButton(onSearch = { searchTerm ->
+            searchUsers(searchTerm, setUserList, setDone)
+        })
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (done) {
+                UserList(userList)
+            } else {
+                CircularProgressIndicator()
+            }
+        }
+        LaunchedEffect(Unit) {
+            fetchAll(setDone, setUserList)
         }
     }
 
@@ -98,43 +128,100 @@ class MainActivity : ComponentActivity() {
 
 
     @Composable
-    fun UserList() {
-
-        val (done, setDone) = remember { mutableStateOf(false) }
-        val (userList, setUserList) = remember { mutableStateOf(emptyList<Person>()) }
-
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (done) {
-                LazyColumn() {
-                    items(userList) { user ->
-                        UserCard(person = user)
-                    }
-                }
-            } else {
-                CircularProgressIndicator()
+    fun UserList(userList: List<Person>) {
+        LazyColumn() {
+            items(userList) { user ->
+                UserCard(person = user)
             }
         }
+    }
 
-        LaunchedEffect(Unit) {
-            fetchAll(setDone, setUserList)
+    @Composable
+    fun SearchButton(onSearch: (String) -> Unit) {
+        var expanded by remember { mutableStateOf(false) }
+        var searched by remember { mutableStateOf(false) }
+        var searchTerm by remember { mutableStateOf("") }
+
+        SimpleButton(buttonText = "Search users") {
+            expanded = !expanded
+        }
+        if (expanded) {
+            if(searched){
+                SimpleButton(buttonText = "Get all users") {
+                    onSearch("")
+                    expanded = false
+                    searched = false
+                }
+            }
+            Row {
+                TextField(value = searchTerm, onValueChange = {
+                    searchTerm = it
+                },
+                label = { Text(text = "Search by name or email") })
+                SimpleButton(buttonText = "Start Search") {
+                    println("Searching for $searchTerm")
+                    onSearch(searchTerm)
+                    expanded = false
+                    searched = true
+                }
+            }
+        }
+    }
+
+
+
+    fun searchUsers(searchTerm: String, setUsers: (List<Person>) -> Unit, setDone: (Boolean) -> Unit){
+        setDone(false)
+        thread {
+            val client = OkHttpClient()
+            val request = Request.Builder()
+                .url("https://dummyjson.com/users/search?q=$searchTerm")
+                .build()
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            val mp = ObjectMapper()
+            val myObject: DummyJsonObject = mp.readValue(responseBody, DummyJsonObject::class.java)
+            val persons: MutableList<Person>? = myObject.users
+            if (persons != null) {
+                runOnUiThread {
+                    setUsers(persons)
+                }
+                persons.forEach {
+                    println("${it.firstName} ${it.lastName}")
+                }
+            }
+            response.close()
+            runOnUiThread {
+                setDone(true)
+            }
+
         }
     }
 }
 
+
+
+
+// Rip in peace. Trying to make this popup work took way too much out of me
+// mentally and physically, I'll leave this here to remind myself that
+// making things look nice isn't worth it, especially in android because
+// nothing actually works.
+
+/*
 @OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
 @Composable
 fun SearchPopUp(){
+
     var textFieldSize by remember { mutableStateOf(Size.Zero)}
     val (popup, setPopup) = remember { mutableStateOf(false) }
     val options = listOf("First name", "Last name", "Age", "Gender")
     var expanded by remember { mutableStateOf(false) }
     var selectedOptionText by remember { mutableStateOf(options[0]) }
     var searchText by remember { mutableStateOf("") }
+    var isTextFieldFocused by remember { mutableStateOf(false) }
 
+    val focusRequester = remember { FocusRequester() }
     val icon = if (expanded)
         Icons.Filled.KeyboardArrowUp
     else
@@ -147,7 +234,9 @@ fun SearchPopUp(){
     if (popup) {
         Popup(
             alignment = Alignment.Center,
-            onDismissRequest = { setPopup(false) },
+            onDismissRequest = {
+                setPopup(false)
+            },
             properties = PopupProperties(dismissOnBackPress = true)
         ) {
             Column(modifier = Modifier
@@ -211,17 +300,26 @@ fun SearchPopUp(){
 
                 TextField(value = searchText, onValueChange = {searchText = it}, modifier = Modifier
                     .fillMaxWidth(0.9f)
-                    .align(Alignment.CenterHorizontally))
+                    .align(Alignment.CenterHorizontally)
+                    .onFocusChanged {isFocused ->
+                        if (isFocused.isFocused) {
+                            println(isFocused.isFocused)
+                            setPopup(true)
+                        }
+                    }
+                )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
                 SimpleButton(buttonText = "Start search", offset = 0.9f) {
                     println("$searchText from $selectedOptionText")
+
                 }
             }
         }
     }
 }
+*/
 
 @Composable
 fun UserCard(person: Person) {
