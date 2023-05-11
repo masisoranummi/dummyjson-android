@@ -18,8 +18,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -78,20 +77,65 @@ class MainActivity : ComponentActivity() {
     fun MyScreen() {
         val (done, setDone) = remember { mutableStateOf(false) }
         val (userList, setUserList) = remember { mutableStateOf(emptyList<Person>()) }
-        SearchButton(onSearch = { searchTerm ->
-            searchUsers(searchTerm, setUserList, setDone)
-        })
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+
+        Scaffold(
+            bottomBar = {
+                BottomAppBar(
+                    backgroundColor = MaterialTheme.colors.primary,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        BottomNavigationItem(
+                            icon = { Icon(Icons.Default.Add, contentDescription = "Add User") },
+                            label = { Text("Add", maxLines = 1) },
+                            onClick = { /* Handle add user */ },
+                            selected = true
+                        )
+                        BottomNavigationItem(
+                            icon = { Icon(Icons.Default.Delete, contentDescription = "Delete User") },
+                            label = { Text("Delete", maxLines = 1) },
+                            onClick = { /* Handle delete user */ },
+                            selected = true
+                        )
+                        BottomNavigationItem(
+                            icon = { Icon(Icons.Default.Person, contentDescription = "Get all users") },
+                            label = { Text("Get all", maxLines = 1) },
+                            onClick = {
+                                setDone(false)
+                                fetchAll(setDone, setUserList)
+                            },
+                            selected = true
+                        )
+                    }
+                }
+            }
         ) {
-            if (done) {
-                UserList(userList)
-            } else {
-                CircularProgressIndicator()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(it)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if(done) {
+                        SearchButton(onSearch = { searchTerm ->
+                            searchUsers(searchTerm, setUserList, setDone)
+                        })
+                    }
+                    if (done) {
+                        UserList(userList)
+                    } else {
+                        CircularProgressIndicator()
+                    }
+                }
             }
         }
+
         LaunchedEffect(Unit) {
             fetchAll(setDone, setUserList)
         }
