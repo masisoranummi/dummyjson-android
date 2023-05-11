@@ -47,6 +47,9 @@ import androidx.compose.ui.window.PopupProperties
 import coil.compose.AsyncImage
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URL
@@ -77,6 +80,10 @@ class MainActivity : ComponentActivity() {
     fun MyScreen() {
         val (done, setDone) = remember { mutableStateOf(false) }
         val (userList, setUserList) = remember { mutableStateOf(emptyList<Person>()) }
+        val (deletedUsers, setDeletedUsers) = remember { mutableStateOf(emptyList<Int>()) }
+        var firstNameToDelete by remember { mutableStateOf("") }
+        var lastNameToDelete by remember { mutableStateOf("") }
+        var showDialog by remember { mutableStateOf(false) }
 
         Scaffold(
             bottomBar = {
@@ -96,7 +103,9 @@ class MainActivity : ComponentActivity() {
                         BottomNavigationItem(
                             icon = { Icon(Icons.Default.Delete, contentDescription = "Delete User") },
                             label = { Text("Delete", maxLines = 1) },
-                            onClick = { /* Handle delete user */ },
+                            onClick = {
+                                showDialog = true
+                                      },
                             selected = true
                         )
                         BottomNavigationItem(
@@ -104,7 +113,7 @@ class MainActivity : ComponentActivity() {
                             label = { Text("Get all", maxLines = 1) },
                             onClick = {
                                 setDone(false)
-                                fetchAll(setDone, setUserList)
+                                fetchAll(setDone, setUserList, deletedUsers)
                             },
                             selected = true
                         )
@@ -124,7 +133,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     if(done) {
                         SearchButton(onSearch = { searchTerm ->
-                            searchUsers(searchTerm, setUserList, setDone)
+                            searchUsers(searchTerm, setUserList, setDone, deletedUsers)
                         })
                     }
                     if (done) {
@@ -133,17 +142,90 @@ class MainActivity : ComponentActivity() {
                         CircularProgressIndicator()
                     }
                 }
+                if (showDialog) {
+                    DeleteUserDialog(
+                        firstName = firstNameToDelete,
+                        lastName = lastNameToDelete,
+                        onFirstNameChange = { firstNameToDelete = it },
+                        onLastNameChange = { lastNameToDelete = it },
+                        onDeleteConfirmed = {
+                            var toDelete: MutableList<Int> = mutableListOf()
+                            userList.forEach{
+                                if(it.firstName.equals(firstNameToDelete, ignoreCase = true) && it.lastName.equals(lastNameToDelete, ignoreCase = true)){
+                                    toDelete.add(it.id)
+                                }
+                            }
+                            setDeletedUsers(deletedUsers + toDelete)
+                            setDone(false)
+                            fetchAll(setDone, setUserList, deletedUsers + toDelete)
+                            firstNameToDelete = ""
+                            lastNameToDelete = ""
+                            showDialog = false
+                        },
+                        onDeleteCanceled = { showDialog = false }
+                    )
+                }
             }
         }
 
         LaunchedEffect(Unit) {
-            fetchAll(setDone, setUserList)
+            fetchAll(setDone, setUserList, deletedUsers)
         }
     }
 
+    @Composable
+    fun DeleteUserDialog(
+        firstName: String,
+        lastName: String,
+        onFirstNameChange: (String) -> Unit,
+        onLastNameChange: (String) -> Unit,
+        onDeleteConfirmed: () -> Unit,
+        onDeleteCanceled: () -> Unit
+    ) {
+        AlertDialog(
+            onDismissRequest = onDeleteCanceled,
+            title = { Text("Delete user") },
+            text = {
+                Column {
+                    Text("Enter the user's first and last name to delete", modifier = Modifier.padding(10.dp))
+                    TextField(
+                        value = firstName,
+                        onValueChange = onFirstNameChange,
+                        modifier = Modifier.padding(10.dp),
+                        label = { Text(text = "First name") }
+                    )
+                    TextField(
+                        value = lastName,
+                        onValueChange = onLastNameChange,
+                        modifier = Modifier.padding(10.dp),
+                        label = { Text(text = "Last name") }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (firstName.isNotEmpty() && lastName.isNotEmpty()) {
+                            onDeleteConfirmed()
+                        }
+                    }
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = onDeleteCanceled
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
-    private fun fetchAll(setDone: (Boolean) -> Unit, setUserList: (List<Person>) -> Unit) {
+    private fun fetchAll(setDone: (Boolean) -> Unit, setUserList: (List<Person>) -> Unit, deletedUsers: List<Int>) {
         thread {
+            println(deletedUsers)
             val client = OkHttpClient()
             val request = Request.Builder()
                 .url("https://dummyjson.com/users")
@@ -153,13 +235,11 @@ class MainActivity : ComponentActivity() {
 
             val mp = ObjectMapper()
             val myObject: DummyJsonObject = mp.readValue(responseBody, DummyJsonObject::class.java)
-            val persons: MutableList<Person>? = myObject.users
+            var persons: MutableList<Person>? = myObject.users
             if (persons != null) {
+                persons.removeIf { it.id in deletedUsers }
                 runOnUiThread {
                     setUserList(persons)
-                }
-                persons.forEach {
-                    println("${it.firstName} ${it.lastName}")
                 }
             }
             response.close()
@@ -183,20 +263,12 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun SearchButton(onSearch: (String) -> Unit) {
         var expanded by remember { mutableStateOf(false) }
-        var searched by remember { mutableStateOf(false) }
         var searchTerm by remember { mutableStateOf("") }
 
         SimpleButton(buttonText = "Search users") {
             expanded = !expanded
         }
         if (expanded) {
-            if(searched){
-                SimpleButton(buttonText = "Get all users") {
-                    onSearch("")
-                    expanded = false
-                    searched = false
-                }
-            }
             Row {
                 TextField(value = searchTerm, onValueChange = {
                     searchTerm = it
@@ -206,7 +278,6 @@ class MainActivity : ComponentActivity() {
                     println("Searching for $searchTerm")
                     onSearch(searchTerm)
                     expanded = false
-                    searched = true
                 }
             }
         }
@@ -214,7 +285,7 @@ class MainActivity : ComponentActivity() {
 
 
 
-    fun searchUsers(searchTerm: String, setUsers: (List<Person>) -> Unit, setDone: (Boolean) -> Unit){
+    fun searchUsers(searchTerm: String, setUsers: (List<Person>) -> Unit, setDone: (Boolean) -> Unit, deletedUsers: List<Int>){
         setDone(false)
         thread {
             val client = OkHttpClient()
@@ -228,6 +299,7 @@ class MainActivity : ComponentActivity() {
             val myObject: DummyJsonObject = mp.readValue(responseBody, DummyJsonObject::class.java)
             val persons: MutableList<Person>? = myObject.users
             if (persons != null) {
+                persons.removeIf { it.id in deletedUsers }
                 runOnUiThread {
                     setUsers(persons)
                 }
