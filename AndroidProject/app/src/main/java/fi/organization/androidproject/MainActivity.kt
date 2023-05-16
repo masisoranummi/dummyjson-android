@@ -62,7 +62,7 @@ import kotlin.math.exp
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class Person(var firstName: String? = null, var lastName: String? = null, var age: Int = 0,
                   var email: String? = null, var phone: String? = null,
-                  var id: Int = 0, var image: String? = null)
+                  var id: Int = 0, var image: String? = null, var isDeleted: Boolean = false)
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class DummyJsonObject(var users: MutableList<Person>? = null)
@@ -153,14 +153,47 @@ class MainActivity : ComponentActivity() {
                         onFirstNameChange = { firstNameToDelete = it },
                         onLastNameChange = { lastNameToDelete = it },
                         onDeleteConfirmed = {
+                            var updatedUsers = emptyList<Person>()
                             var toDelete: MutableList<Int> = mutableListOf()
-                            userList.forEach{
-                                if(it.firstName.equals(firstNameToDelete, ignoreCase = true) && it.lastName.equals(lastNameToDelete, ignoreCase = true)){
-                                    toDelete.add(it.id)
+                            val removed = addedUsers.toMutableList().removeIf { user ->
+                                user.firstName.equals(firstNameToDelete, ignoreCase = true) && user.lastName.equals(lastNameToDelete, ignoreCase = true)
+                            }
+                            if (removed) {
+                                println("removed from added")
+                                setAddedUsers(addedUsers.toMutableList().apply {
+                                    removeIf { user ->
+                                        user.firstName.equals(firstNameToDelete, ignoreCase = true) && user.lastName.equals(lastNameToDelete, ignoreCase = true)
+                                    }
+                                })
+                                updatedUsers = addedUsers.filter { user ->
+                                    !(user.firstName.equals(firstNameToDelete, ignoreCase = true) && user.lastName.equals(lastNameToDelete, ignoreCase = true))
+                                }
+                            } else {
+                                userList.forEach{
+                                    if(it.firstName.equals(firstNameToDelete, ignoreCase = true) && it.lastName.equals(lastNameToDelete, ignoreCase = true)){
+                                        val client = OkHttpClient()
+                                        thread {
+                                            val request = Request.Builder()
+                                                .url("https://dummyjson.com/users/${it.id}")
+                                                .delete()
+                                                .build()
+                                            val response = client.newCall(request).execute()
+                                            val responseBody = response.body?.string()
+                                            println(responseBody)
+                                            val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
+                                            /* TODO: add toast */
+                                            println("${newPerson.firstName} ${newPerson.lastName} deleted")
+                                        }
+                                        toDelete.add(it.id)
+                                    }
                                 }
                             }
                             setDone(false)
-                            fetchAll(setDone, setUserList, deletedUsers + toDelete, addedUsers)
+                            if(removed){
+                                fetchAll(setDone, setUserList, deletedUsers + toDelete, updatedUsers)
+                            } else {
+                                fetchAll(setDone, setUserList, deletedUsers + toDelete, addedUsers)
+                            }
                             setDeletedUsers(deletedUsers + toDelete)
                             firstNameToDelete = ""
                             lastNameToDelete = ""
@@ -181,7 +214,7 @@ class MainActivity : ComponentActivity() {
                                 .add("age", age)
                                 .add("phone", phone)
                                 .add("email", email)
-                                .add("image", "https://robohash.org/${first+last}.png?size=50x50&set=set1")
+                                .add("image", "https://robohash.org/${first+last}.png?set=set1")
                                 .build()
                             val request = Request.Builder()
                                 .url("https://dummyjson.com/users/add")
@@ -190,6 +223,7 @@ class MainActivity : ComponentActivity() {
                             val response = client.newCall(request).execute()
                             val responseBody = response.body?.string()
                             val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
+                            /* TODO: add toast */
                             println(newPerson)
                             fetchAll(setDone, setUserList, deletedUsers, addedUsers + newPerson)
                             setAddedUsers(addedUsers + newPerson)
