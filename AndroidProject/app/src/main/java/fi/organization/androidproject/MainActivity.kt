@@ -145,27 +145,43 @@ class MainActivity : ComponentActivity() {
                     if (done) {
                         UserList(userList){id, firstName, lastName, phone, email, age ->
                             setDone(false)
-                            /* TODO: editing added users */
-                            thread {
-                                val client = OkHttpClient()
-                                val form = FormBody.Builder()
-                                    .add("firstName", firstName)
-                                    .add("lastName", lastName)
-                                    .add("age", age.toString())
-                                    .add("phone", phone)
-                                    .add("email", email)
-                                    .build()
-                                val request = Request.Builder()
-                                    .url("https://dummyjson.com/users/${id}")
-                                    .put(form)
-                                    .build()
-                                val response = client.newCall(request).execute()
-                                val responseBody = response.body?.string()
-                                println(responseBody)
-                                val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
-                                println(newPerson)
-                                fetchAll(setDone, setUserList, deletedUsers, addedUsers, editedUsers + newPerson)
-                                setEditedUsers(editedUsers + newPerson)
+                            var edited = false
+                            
+                            for (addedUser in addedUsers) {
+                                if(addedUser.id == id){
+                                    // please clean this up
+                                    addedUser.firstName = firstName
+                                    addedUser.lastName = lastName
+                                    addedUser.phone = phone
+                                    addedUser.email = email
+                                    addedUser.age = age
+                                    edited = true
+                                    println(addedUser)
+                                    fetchAll(setDone, setUserList, deletedUsers, addedUsers, editedUsers)
+                                }
+                            }
+
+                            if(!edited){
+                                thread {
+                                    val client = OkHttpClient()
+                                    val form = FormBody.Builder()
+                                        .add("firstName", firstName)
+                                        .add("lastName", lastName)
+                                        .add("age", age.toString())
+                                        .add("phone", phone)
+                                        .add("email", email)
+                                        .build()
+                                    val request = Request.Builder()
+                                        .url("https://dummyjson.com/users/${id}")
+                                        .put(form)
+                                        .build()
+                                    val response = client.newCall(request).execute()
+                                    val responseBody = response.body?.string()
+                                    val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
+                                    println(newPerson)
+                                    fetchAll(setDone, setUserList, deletedUsers, addedUsers, editedUsers + newPerson)
+                                    setEditedUsers(editedUsers + newPerson)
+                                }
                             }
                         }
                     } else {
