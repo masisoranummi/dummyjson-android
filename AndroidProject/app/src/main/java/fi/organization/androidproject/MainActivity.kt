@@ -86,9 +86,7 @@ class MainActivity : ComponentActivity() {
         val (deletedUsers, setDeletedUsers) = remember { mutableStateOf(emptyList<Int>()) }
         val (addedUsers, setAddedUsers) = remember { mutableStateOf(emptyList<Person>()) }
         val (editedUsers, setEditedUsers) = remember { mutableStateOf(emptyList<Person>()) }
-        var firstNameToDelete by remember { mutableStateOf("") }
-        var lastNameToDelete by remember { mutableStateOf("") }
-        var showDeleteDialog by remember { mutableStateOf(false) }
+        var showSearchDialog by remember { mutableStateOf(false) }
         var showAddDialog by remember { mutableStateOf(false) }
 
         Scaffold(
@@ -107,10 +105,10 @@ class MainActivity : ComponentActivity() {
                             selected = true
                         )
                         BottomNavigationItem(
-                            icon = { Icon(Icons.Default.Delete, contentDescription = "Delete User") },
-                            label = { Text("Delete", maxLines = 1) },
+                            icon = { Icon(Icons.Default.Search, contentDescription = "Search User") },
+                            label = { Text("Search", maxLines = 1) },
                             onClick = {
-                                showDeleteDialog = true
+                                showSearchDialog = true
                                       },
                             selected = true
                         )
@@ -137,16 +135,39 @@ class MainActivity : ComponentActivity() {
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if(done) {
-                        SearchButton(onSearch = { searchTerm ->
-                            searchUsers(searchTerm, setUserList, setDone, deletedUsers, addedUsers)
-                        })
-                    }
                     if (done) {
-                        UserList(userList){id, firstName, lastName, phone, email, age ->
+                        UserList(userList, onDelete = {id ->
+                            setDone(false)
+                            var addedUsersList = addedUsers.toMutableList()
+                            val userDeleted = addedUsersList.removeIf { addedUser ->
+                                addedUser.id == id
+                            }
+                            if(userDeleted) {
+                                runOnUiThread {
+                                    setAddedUsers(addedUsersList)
+                                }
+                                fetchAll(setDone, setUserList, deletedUsers, addedUsersList, editedUsers)
+                            } else {
+                                val client = OkHttpClient()
+                                thread {
+                                    val request = Request.Builder()
+                                        .url("https://dummyjson.com/users/${id}")
+                                        .delete()
+                                        .build()
+                                    val response = client.newCall(request).execute()
+                                    val responseBody = response.body?.string()
+                                    println(responseBody)
+                                    val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
+                                    /* TODO: add toast */
+                                    println("${newPerson.firstName} ${newPerson.lastName} deleted")
+                                    fetchAll(setDone, setUserList, deletedUsers + newPerson.id, addedUsers, editedUsers)
+                                    setDeletedUsers(deletedUsers + newPerson.id)
+                                }
+                            }
+                        }){ id, firstName, lastName, phone, email, age ->
                             setDone(false)
                             var edited = false
-                            
+
                             for (addedUser in addedUsers) {
                                 if(addedUser.id == id){
                                     // please clean this up
@@ -188,61 +209,12 @@ class MainActivity : ComponentActivity() {
                         CircularProgressIndicator()
                     }
                 }
-                if (showDeleteDialog) {
-                    DeleteUserDialog(
-                        firstName = firstNameToDelete,
-                        lastName = lastNameToDelete,
-                        onFirstNameChange = { firstNameToDelete = it },
-                        onLastNameChange = { lastNameToDelete = it },
-                        onDeleteConfirmed = {
-                            var updatedUsers = emptyList<Person>()
-                            var toDelete: MutableList<Int> = mutableListOf()
-                            val removed = addedUsers.toMutableList().removeIf { user ->
-                                user.firstName.equals(firstNameToDelete, ignoreCase = true) && user.lastName.equals(lastNameToDelete, ignoreCase = true)
-                            }
-                            if (removed) {
-                                println("removed from added")
-                                setAddedUsers(addedUsers.toMutableList().apply {
-                                    removeIf { user ->
-                                        user.firstName.equals(firstNameToDelete, ignoreCase = true) && user.lastName.equals(lastNameToDelete, ignoreCase = true)
-                                    }
-                                })
-                                updatedUsers = addedUsers.filter { user ->
-                                    !(user.firstName.equals(firstNameToDelete, ignoreCase = true) && user.lastName.equals(lastNameToDelete, ignoreCase = true))
-                                }
-                            } else {
-                                userList.forEach{
-                                    if(it.firstName.equals(firstNameToDelete, ignoreCase = true) && it.lastName.equals(lastNameToDelete, ignoreCase = true)){
-                                        val client = OkHttpClient()
-                                        thread {
-                                            val request = Request.Builder()
-                                                .url("https://dummyjson.com/users/${it.id}")
-                                                .delete()
-                                                .build()
-                                            val response = client.newCall(request).execute()
-                                            val responseBody = response.body?.string()
-                                            println(responseBody)
-                                            val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
-                                            /* TODO: add toast */
-                                            println("${newPerson.firstName} ${newPerson.lastName} deleted")
-                                        }
-                                        toDelete.add(it.id)
-                                    }
-                                }
-                            }
-                            setDone(false)
-                            if(removed){
-                                fetchAll(setDone, setUserList, deletedUsers + toDelete, updatedUsers, editedUsers)
-                            } else {
-                                fetchAll(setDone, setUserList, deletedUsers + toDelete, addedUsers, editedUsers)
-                            }
-                            setDeletedUsers(deletedUsers + toDelete)
-                            firstNameToDelete = ""
-                            lastNameToDelete = ""
-                            showDeleteDialog = false
-                        },
-                        onDeleteCanceled = { showDeleteDialog = false }
-                    )
+                if (showSearchDialog){
+                    SearchUserDialog(onSearchCanceled = { showSearchDialog = false }) { searchTerm ->
+                        setDone(false)
+                        showSearchDialog = false
+                        searchUsers(searchTerm, setUserList, setDone, deletedUsers, addedUsers, editedUsers)
+                    }
                 }
                 if (showAddDialog) {
                     AddUserDialog(onAddCanceled = { showAddDialog = false }) { first, last, age, phone, email ->
@@ -281,48 +253,37 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun DeleteUserDialog(
-        firstName: String,
-        lastName: String,
-        onFirstNameChange: (String) -> Unit,
-        onLastNameChange: (String) -> Unit,
-        onDeleteConfirmed: () -> Unit,
-        onDeleteCanceled: () -> Unit
-    ) {
+    fun SearchUserDialog(onSearchCanceled: () -> Unit,onSearchConfirmed: (String) -> Unit){
+        var searchTerm by remember { mutableStateOf("") }
+
         AlertDialog(
-            onDismissRequest = onDeleteCanceled,
-            title = { Text("Delete user") },
+            onDismissRequest = onSearchCanceled,
+            title = { Text("Add user") },
             text = {
                 Column {
-                    Text("Enter the user's first and last name to delete", modifier = Modifier.padding(10.dp))
+                    Text("Search for users by name or email", modifier = Modifier.padding(10.dp))
                     TextField(
-                        value = firstName,
-                        onValueChange = onFirstNameChange,
+                        value = searchTerm,
+                        onValueChange = { searchTerm = it },
                         modifier = Modifier.padding(10.dp),
-                        label = { Text(text = "First name") }
-                    )
-                    TextField(
-                        value = lastName,
-                        onValueChange = onLastNameChange,
-                        modifier = Modifier.padding(10.dp),
-                        label = { Text(text = "Last name") }
+                        label = { Text(text = "Search users") }
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        if (firstName.isNotEmpty() && lastName.isNotEmpty()) {
-                            onDeleteConfirmed()
+                        if (searchTerm.isNotEmpty()) {
+                            onSearchConfirmed(searchTerm)
                         }
                     }
                 ) {
-                    Text("Delete")
+                    Text("Add")
                 }
             },
             dismissButton = {
                 Button(
-                    onClick = onDeleteCanceled
+                    onClick = onSearchCanceled
                 ) {
                     Text("Cancel")
                 }
@@ -446,16 +407,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
-    @Composable
-    fun UserList(userList: List<Person>, onEdit: (Int, String, String, String, String, Int) -> Unit) {
-        LazyColumn() {
-            items(userList) { user ->
-                UserCard(person = user, onEdit = onEdit)
-            }
-        }
-    }
-
     @Composable
     fun SearchButton(onSearch: (String) -> Unit) {
         var expanded by remember { mutableStateOf(false) }
@@ -479,9 +430,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
-
-    fun searchUsers(searchTerm: String, setUsers: (List<Person>) -> Unit, setDone: (Boolean) -> Unit, deletedUsers: List<Int>, addedUsers: List<Person>){
+    fun searchUsers(searchTerm: String, setUsers: (List<Person>) -> Unit, setDone: (Boolean) -> Unit,
+                    deletedUsers: List<Int>, addedUsers: List<Person>, editedUsers: List<Person>){
         setDone(false)
         thread {
             val client = OkHttpClient()
@@ -501,6 +451,20 @@ class MainActivity : ComponentActivity() {
                         persons.add(it)
                     }
                 }
+
+                persons.removeIf { person ->
+                    editedUsers.any { editedUser ->
+                        editedUser.id == person.id
+                    }
+                }
+
+                editedUsers.forEach{
+                    if(it.firstName!!.contains(searchTerm, ignoreCase = true) || it.lastName!!.contains(searchTerm, ignoreCase = true)
+                        || it.email!!.contains(searchTerm, ignoreCase = true)) {
+                        persons.add(it)
+                    }
+                }
+
                 persons.removeIf { it.id in deletedUsers }
                 runOnUiThread {
                     setUsers(persons)
@@ -515,155 +479,6 @@ class MainActivity : ComponentActivity() {
             }
 
         }
-    }
-}
-
-
-@Composable
-fun UserCard(person: Person, onEdit: (Int, String, String, String, String, Int) -> Unit) {
-    var opened by remember { mutableStateOf(false) }
-    if(opened){
-        EditUserDialog(onEditCanceled = {
-            opened = !opened
-        },
-        person = person, onEditConfirmed = onEdit)
-    }
-    Box(modifier = Modifier
-        .padding(all = 10.dp)
-        .border(width = 3.dp, color = Color.Black, shape = RoundedCornerShape(8.dp))
-        .padding(all = 10.dp)
-        .fillMaxWidth()
-        .height(80.dp)
-    ) {
-        Row {
-            AsyncImage(
-                model = person.image,
-                contentDescription = null,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .size(70.dp)
-            )
-            Column(verticalArrangement = Arrangement.Center, modifier = Modifier.height(80.dp)) {
-                person.firstName?.let { Text(text = it) }
-                Spacer(modifier = Modifier.height(4.dp))
-                person.lastName?.let { Text(text = it) }
-            }
-            Spacer(modifier = Modifier.width(20.dp))
-            Column(verticalArrangement = Arrangement.Center, modifier = Modifier.height(80.dp)) {
-                person.phone?.let { Text(text = "Phone: $it") }
-                Spacer(modifier = Modifier.height(4.dp))
-                person.email?.let { Text(text = "Email: $it") }
-            }
-            Box(
-                modifier = Modifier
-                    .layout { measurable, constraints ->
-                        val placeable = measurable.measure(constraints)
-                        layout(constraints.maxWidth, constraints.maxHeight) {
-                            placeable.placeRelative(constraints.maxWidth - placeable.width, 0)
-                        }
-                    }
-                    .size(24.dp)
-            ) {
-                IconButton(
-                    onClick = {
-                        opened = !opened
-                        println(opened)
-                    }
-                ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Options")
-                }
-            }
-        }
-    }
-
-}
-
-@Composable
-fun EditUserDialog(onEditCanceled: () -> Unit, person: Person, onEditConfirmed: (Int, String, String, String, String, Int) -> Unit){
-
-    var firstNameToAdd by remember { mutableStateOf(person.firstName!!) }
-    var lastNameToAdd by remember { mutableStateOf(person.lastName!!) }
-    var phoneToAdd by remember { mutableStateOf(person.phone!!) }
-    var emailToAdd by remember { mutableStateOf(person.email!!) }
-    var ageToAdd by remember { mutableStateOf(person.age) }
-
-    var ageInput by remember { mutableStateOf(person.age.toString()) }
-
-    AlertDialog(
-        onDismissRequest = onEditCanceled,
-        title = { Text("Edit user") },
-        text = {
-            Column {
-                Text("Enter the users information", modifier = Modifier.padding(10.dp))
-                TextField(
-                    value = firstNameToAdd,
-                    onValueChange = { firstNameToAdd = it },
-                    modifier = Modifier.padding(10.dp),
-                    label = { Text(text = "First name") }
-                )
-                TextField(
-                    value = lastNameToAdd,
-                    onValueChange = { lastNameToAdd = it },
-                    modifier = Modifier.padding(10.dp),
-                    label = { Text(text = "Last name") }
-                )
-                TextField(
-                    value = ageInput,
-                    onValueChange = {
-                        ageInput = it
-                        if (it.isEmpty()) {
-                            ageToAdd = 0 // Default value when empty
-                        } else if (it.matches(Regex("^\\d+\$"))) {
-                            ageToAdd = it.toInt()
-                        }
-                    },
-                    modifier = Modifier.padding(10.dp),
-                    label = { Text(text = "Age") },
-                    keyboardOptions = KeyboardOptions.Default.copy(
-                        keyboardType = KeyboardType.NumberPassword
-                    )
-                )
-                TextField(
-                    value = phoneToAdd,
-                    onValueChange = { phoneToAdd = it },
-                    modifier = Modifier.padding(10.dp),
-                    label = { Text(text = "Phone") }
-                )
-                TextField(
-                    value = emailToAdd,
-                    onValueChange = { emailToAdd = it },
-                    modifier = Modifier.padding(10.dp),
-                    label = { Text(text = "Email") }
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onEditConfirmed(person.id,firstNameToAdd, lastNameToAdd, phoneToAdd, emailToAdd, ageToAdd)
-                    onEditCanceled()
-                }
-            ) {
-                Text("Edit")
-            }
-        },
-        dismissButton = {
-            Button(
-                onClick = onEditCanceled
-            ) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
-fun SimpleButton(buttonText: String, offset: Float = 1.0f, onButtonClick: () -> Unit) {
-    Button(onClick = onButtonClick, modifier = Modifier
-        .padding(start = 16.dp * offset, end = 16.dp)
-        .fillMaxWidth())
-    {
-        Text(text = buttonText)
     }
 }
 
