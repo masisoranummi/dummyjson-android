@@ -1,75 +1,25 @@
 package fi.organization.androidproject
 
-import android.content.Intent
 import android.os.Bundle
-import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.toSize
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import coil.compose.AsyncImage
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody
-import java.net.URL
 import kotlin.concurrent.thread
-import kotlin.math.exp
-
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class Person(var firstName: String? = null, var lastName: String? = null, var age: Int = 0,
-                  var email: String? = null, var phone: String? = null,
-                  var id: Int = 0, var image: String? = null, var isDeleted: Boolean = false)
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-data class DummyJsonObject(var users: MutableList<Person>? = null)
 
 class MainActivity : ComponentActivity() {
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -91,9 +41,7 @@ class MainActivity : ComponentActivity() {
 
         Scaffold(
             bottomBar = {
-                BottomAppBar(
-                    backgroundColor = MaterialTheme.colors.primary,
-                ) {
+                BottomAppBar {
                     Row(
                         horizontalArrangement = Arrangement.SpaceAround,
                         modifier = Modifier.fillMaxWidth()
@@ -107,9 +55,7 @@ class MainActivity : ComponentActivity() {
                         BottomNavigationItem(
                             icon = { Icon(Icons.Default.Search, contentDescription = "Search User") },
                             label = { Text("Search", maxLines = 1) },
-                            onClick = {
-                                showSearchDialog = true
-                                      },
+                            onClick = { showSearchDialog = true },
                             selected = true
                         )
                         BottomNavigationItem(
@@ -138,7 +84,7 @@ class MainActivity : ComponentActivity() {
                     if (done) {
                         UserList(userList, onDelete = {id ->
                             setDone(false)
-                            var addedUsersList = addedUsers.toMutableList()
+                            val addedUsersList = addedUsers.toMutableList()
                             val userDeleted = addedUsersList.removeIf { addedUser ->
                                 addedUser.id == id
                             }
@@ -170,7 +116,6 @@ class MainActivity : ComponentActivity() {
 
                             for (addedUser in addedUsers) {
                                 if(addedUser.id == id){
-                                    // please clean this up
                                     addedUser.firstName = firstName
                                     addedUser.lastName = lastName
                                     addedUser.phone = phone
@@ -383,7 +328,7 @@ class MainActivity : ComponentActivity() {
 
             val mp = ObjectMapper()
             val myObject: DummyJsonObject = mp.readValue(responseBody, DummyJsonObject::class.java)
-            var persons: MutableList<Person>? = myObject.users
+            val persons: MutableList<Person>? = myObject.users
             if (persons != null) {
                 persons.addAll(addedUsers)
 
@@ -407,30 +352,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @Composable
-    fun SearchButton(onSearch: (String) -> Unit) {
-        var expanded by remember { mutableStateOf(false) }
-        var searchTerm by remember { mutableStateOf("") }
-
-        SimpleButton(buttonText = "Search users") {
-            expanded = !expanded
-        }
-        if (expanded) {
-            Row {
-                TextField(value = searchTerm, onValueChange = {
-                    searchTerm = it
-                },
-                label = { Text(text = "Search by name or email") })
-                SimpleButton(buttonText = "Start Search") {
-                    println("Searching for $searchTerm")
-                    onSearch(searchTerm)
-                    expanded = false
-                }
-            }
-        }
-    }
-
-    fun searchUsers(searchTerm: String, setUsers: (List<Person>) -> Unit, setDone: (Boolean) -> Unit,
+    private fun searchUsers(searchTerm: String, setUsers: (List<Person>) -> Unit, setDone: (Boolean) -> Unit,
                     deletedUsers: List<Int>, addedUsers: List<Person>, editedUsers: List<Person>){
         setDone(false)
         thread {
@@ -480,10 +402,4 @@ class MainActivity : ComponentActivity() {
 
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-
 }
