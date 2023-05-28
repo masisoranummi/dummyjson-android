@@ -1,5 +1,6 @@
 package fi.organization.androidproject
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
@@ -9,6 +10,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
@@ -22,6 +24,7 @@ fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: 
     var ageToAdd by remember { mutableStateOf(person.age) }
 
     var ageInput by remember { mutableStateOf(person.age.toString()) }
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onEditCanceled,
@@ -74,8 +77,17 @@ fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: 
         confirmButton = {
             Button(
                 onClick = {
-                    onEditConfirmed(person.id,firstNameToAdd, lastNameToAdd, phoneToAdd, emailToAdd, ageToAdd)
-                    onEditCanceled()
+                    if(firstNameToAdd.isNotEmpty() && lastNameToAdd.isNotEmpty()
+                        && phoneToAdd.isNotEmpty() && emailToAdd.isNotEmpty()){
+                        onEditConfirmed(person.id,firstNameToAdd, lastNameToAdd, phoneToAdd, emailToAdd, ageToAdd)
+                        onEditCanceled()
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "One or more of the fields are empty",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
             ) {
                 Text("Edit user")

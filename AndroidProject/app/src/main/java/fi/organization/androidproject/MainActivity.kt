@@ -1,6 +1,7 @@
 package fi.organization.androidproject
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -19,6 +21,13 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import kotlin.concurrent.thread
 
+/**
+ * The `MainActivity` class is the entry point of the application.
+ * It represents the main activity of the app and is responsible for
+ * handling user interactions and managing the app's UI.
+ *
+ * This is the only activity in the application
+ */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +47,7 @@ class MainActivity : ComponentActivity() {
         val (editedUsers, setEditedUsers) = remember { mutableStateOf(emptyList<Person>()) }
         var showSearchDialog by remember { mutableStateOf(false) }
         var showAddDialog by remember { mutableStateOf(false) }
+        val context = LocalContext.current
 
         Scaffold(
             bottomBar = {
@@ -84,11 +94,26 @@ class MainActivity : ComponentActivity() {
                     if (done) {
                         UserList(userList, onDelete = {id ->
                             setDone(false)
+                            var firstName = ""
+                            var lastName = ""
                             val addedUsersList = addedUsers.toMutableList()
                             val userDeleted = addedUsersList.removeIf { addedUser ->
                                 addedUser.id == id
                             }
                             if(userDeleted) {
+                                // Find the deleted user in the list of users
+                                val deletedUser = userList.find { it.id == id }
+
+                                if (deletedUser != null) {
+                                    print("found user")
+                                    firstName = deletedUser.firstName!!
+                                    lastName = deletedUser.lastName!!
+                                    Toast.makeText(
+                                        context,
+                                        "User $firstName $lastName deleted",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                                 runOnUiThread {
                                     setAddedUsers(addedUsersList)
                                 }
@@ -104,10 +129,17 @@ class MainActivity : ComponentActivity() {
                                     val responseBody = response.body?.string()
                                     println(responseBody)
                                     val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
-                                    /* TODO: add toast */
-                                    println("${newPerson.firstName} ${newPerson.lastName} deleted")
+                                    firstName = newPerson.firstName ?: ""
+                                    lastName = newPerson.lastName ?: ""
                                     fetchAll(setDone, setUserList, deletedUsers + newPerson.id, addedUsers, editedUsers)
                                     setDeletedUsers(deletedUsers + newPerson.id)
+                                    runOnUiThread{
+                                        Toast.makeText(
+                                            context,
+                                            "User $firstName $lastName deleted",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
                             }
                         }){ id, firstName, lastName, phone, email, age ->
@@ -149,6 +181,11 @@ class MainActivity : ComponentActivity() {
                                     setEditedUsers(editedUsers + newPerson)
                                 }
                             }
+                            Toast.makeText(
+                                context,
+                                "User $firstName $lastName edited",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else {
                         CircularProgressIndicator()
@@ -182,11 +219,15 @@ class MainActivity : ComponentActivity() {
                             val response = client.newCall(request).execute()
                             val responseBody = response.body?.string()
                             val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
-                            /* TODO: add toast */
                             println(newPerson)
                             fetchAll(setDone, setUserList, deletedUsers, addedUsers + newPerson, editedUsers)
                             setAddedUsers(addedUsers + newPerson)
                         }
+                        Toast.makeText(
+                            context,
+                            "User $first $last added",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             }
@@ -200,6 +241,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun SearchUserDialog(onSearchCanceled: () -> Unit,onSearchConfirmed: (String) -> Unit){
         var searchTerm by remember { mutableStateOf("") }
+        val context = LocalContext.current
 
         AlertDialog(
             onDismissRequest = onSearchCanceled,
@@ -220,6 +262,12 @@ class MainActivity : ComponentActivity() {
                     onClick = {
                         if (searchTerm.isNotEmpty()) {
                             onSearchConfirmed(searchTerm)
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Search field is empty",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     }
                 ) {
@@ -246,6 +294,7 @@ class MainActivity : ComponentActivity() {
         var phoneToAdd by remember { mutableStateOf("") }
         var emailToAdd by remember { mutableStateOf("") }
         var ageToAdd by remember { mutableStateOf("") }
+        val context = LocalContext.current
 
 
         AlertDialog(
@@ -299,6 +348,12 @@ class MainActivity : ComponentActivity() {
                         if (firstNameToAdd.isNotEmpty() && lastNameToAdd.isNotEmpty()
                             && phoneToAdd.isNotEmpty() && emailToAdd.isNotEmpty()) {
                             onAddConfirmed(firstNameToAdd, lastNameToAdd, ageToAdd, phoneToAdd, emailToAdd)
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "One or more of the fields are empty",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     }
                 ) {
