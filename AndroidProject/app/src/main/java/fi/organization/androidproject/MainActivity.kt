@@ -5,7 +5,6 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -13,8 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import com.fasterxml.jackson.databind.ObjectMapper
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -29,6 +26,12 @@ import kotlin.concurrent.thread
  * This is the only activity in the application
  */
 class MainActivity : ComponentActivity() {
+
+    /**
+     * Initializes the activity when it is created.
+     *
+     * @param savedInstanceState The saved instance state.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -38,8 +41,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * A composable fuction for the main UI for the screen
+     */
     @Composable
     fun MyScreen() {
+        // Defining and initializing state variables
         val (done, setDone) = remember { mutableStateOf(false) }
         val (userList, setUserList) = remember { mutableStateOf(emptyList<Person>()) }
         val (deletedUsers, setDeletedUsers) = remember { mutableStateOf(emptyList<Int>()) }
@@ -47,27 +54,34 @@ class MainActivity : ComponentActivity() {
         val (editedUsers, setEditedUsers) = remember { mutableStateOf(emptyList<Person>()) }
         var showSearchDialog by remember { mutableStateOf(false) }
         var showAddDialog by remember { mutableStateOf(false) }
+
+        // Context variable for Toast-messages
         val context = LocalContext.current
 
+        // Building UI using Jetpack Compose components
         Scaffold(
             bottomBar = {
+                // Bottom bar with buttons
                 BottomAppBar {
                     Row(
                         horizontalArrangement = Arrangement.SpaceAround,
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        // Button for showing the dialog for adding users
                         BottomNavigationItem(
                             icon = { Icon(Icons.Default.Add, contentDescription = "Add User") },
                             label = { Text("Add", maxLines = 1) },
                             onClick = { showAddDialog = true },
                             selected = true
                         )
+                        // Button for showing the dialog for searching users
                         BottomNavigationItem(
                             icon = { Icon(Icons.Default.Search, contentDescription = "Search User") },
                             label = { Text("Search", maxLines = 1) },
                             onClick = { showSearchDialog = true },
                             selected = true
                         )
+                        // Button for getting all users
                         BottomNavigationItem(
                             icon = { Icon(Icons.Default.Person, contentDescription = "Get all users") },
                             label = { Text("Get all", maxLines = 1) },
@@ -81,45 +95,50 @@ class MainActivity : ComponentActivity() {
                 }
             }
         ) {
+            // This was needed for the Scaffold to work
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(it)
             ) {
+                // Column that shows the UserCards or the loading icon
+                // depending on if the fetch is done
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (done) {
-                        UserList(userList, onDelete = {id ->
+                        UserList(userList, onDelete = { id ->
+                            // Handle user deletion
                             setDone(false)
-                            var firstName = ""
-                            var lastName = ""
                             val addedUsersList = addedUsers.toMutableList()
+                            // Look through the added users list, if an user with
+                            // the matching id is found, delete that user from the list
+                            // and return a boolean value based on if anything was removed
                             val userDeleted = addedUsersList.removeIf { addedUser ->
                                 addedUser.id == id
                             }
                             if(userDeleted) {
                                 // Find the deleted user in the list of users
                                 val deletedUser = userList.find { it.id == id }
-
                                 if (deletedUser != null) {
-                                    print("found user")
-                                    firstName = deletedUser.firstName!!
-                                    lastName = deletedUser.lastName!!
                                     Toast.makeText(
                                         context,
-                                        "User $firstName $lastName deleted",
+                                        "User ${deletedUser.firstName!!} ${deletedUser.lastName!!} deleted",
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
                                 runOnUiThread {
+                                    // Put the new list with the removed users to
+                                    // the added users list
                                     setAddedUsers(addedUsersList)
                                 }
+                                // Fetch all users
                                 fetchAll(setDone, setUserList, deletedUsers, addedUsersList, editedUsers)
                             } else {
                                 val client = OkHttpClient()
+                                // Thread for handling the delete request
                                 thread {
                                     val request = Request.Builder()
                                         .url("https://dummyjson.com/users/${id}")
@@ -128,25 +147,33 @@ class MainActivity : ComponentActivity() {
                                     val response = client.newCall(request).execute()
                                     val responseBody = response.body?.string()
                                     println(responseBody)
+                                    // Make the result into a new Person-object
                                     val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
-                                    firstName = newPerson.firstName ?: ""
-                                    lastName = newPerson.lastName ?: ""
+                                    // Fetch all users with the new user
                                     fetchAll(setDone, setUserList, deletedUsers + newPerson.id, addedUsers, editedUsers)
+                                    // Put the new users id to the deleted users array
+                                    // after fetching everything, because trying to put it before
+                                    // creates issues, because setDeletedUsers is asynchronous
                                     setDeletedUsers(deletedUsers + newPerson.id)
+                                    // Inform the user that an user was deleted
                                     runOnUiThread{
                                         Toast.makeText(
                                             context,
-                                            "User $firstName $lastName deleted",
+                                            "User ${newPerson.firstName!!} ${newPerson.lastName!!} deleted",
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
                                 }
                             }
                         }){ id, firstName, lastName, phone, email, age ->
+                            // Handle user editing
                             setDone(false)
                             var edited = false
 
                             for (addedUser in addedUsers) {
+                                // If user id matches any of the ones in
+                                // added users, edit that user without
+                                // making a http request
                                 if(addedUser.id == id){
                                     addedUser.firstName = firstName
                                     addedUser.lastName = lastName
@@ -159,6 +186,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            // if user being edited wasn't an added user, do a proper request
                             if(!edited){
                                 thread {
                                     val client = OkHttpClient()
@@ -175,12 +203,16 @@ class MainActivity : ComponentActivity() {
                                         .build()
                                     val response = client.newCall(request).execute()
                                     val responseBody = response.body?.string()
+                                    // Make a new Person-object from the response
                                     val newPerson : Person = ObjectMapper().readValue(responseBody, Person::class.java)
                                     println(newPerson)
+                                    // Fetch everything again with the new edited user
                                     fetchAll(setDone, setUserList, deletedUsers, addedUsers, editedUsers + newPerson)
+                                    // Solves the same async issue that deleting users had
                                     setEditedUsers(editedUsers + newPerson)
                                 }
                             }
+                            // Inform user with a toast that an user was edited
                             Toast.makeText(
                                 context,
                                 "User $firstName $lastName edited",
@@ -188,19 +220,24 @@ class MainActivity : ComponentActivity() {
                             ).show()
                         }
                     } else {
+                        // Show loading icon if the app is fetching data
                         CircularProgressIndicator()
                     }
                 }
                 if (showSearchDialog){
+                    // Show dialog for searching users
                     SearchUserDialog(onSearchCanceled = { showSearchDialog = false }) { searchTerm ->
                         setDone(false)
                         showSearchDialog = false
                         searchUsers(searchTerm, setUserList, setDone, deletedUsers, addedUsers, editedUsers)
                     }
                 }
+                // Show dialog for adding users
                 if (showAddDialog) {
                     AddUserDialog(onAddCanceled = { showAddDialog = false }) { first, last, age, phone, email ->
                         thread {
+                            // Make a request, put the user based on the returned json
+                            // to the added users array and fetch all users again
                             setDone(false)
                             showAddDialog = false
                             val client = OkHttpClient()
@@ -210,6 +247,8 @@ class MainActivity : ComponentActivity() {
                                 .add("age", age)
                                 .add("phone", phone)
                                 .add("email", email)
+                                    // New users get a new generated image based on the
+                                    // users first and last name
                                 .add("image", "https://robohash.org/${first+last}.png?set=set1")
                                 .build()
                             val request = Request.Builder()
@@ -223,6 +262,7 @@ class MainActivity : ComponentActivity() {
                             fetchAll(setDone, setUserList, deletedUsers, addedUsers + newPerson, editedUsers)
                             setAddedUsers(addedUsers + newPerson)
                         }
+                        // Inform the user that user was added
                         Toast.makeText(
                             context,
                             "User $first $last added",
@@ -233,143 +273,21 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Fetch initial data
         LaunchedEffect(Unit) {
             fetchAll(setDone, setUserList, deletedUsers, addedUsers, editedUsers)
         }
     }
 
-    @Composable
-    fun SearchUserDialog(onSearchCanceled: () -> Unit,onSearchConfirmed: (String) -> Unit){
-        var searchTerm by remember { mutableStateOf("") }
-        val context = LocalContext.current
-
-        AlertDialog(
-            onDismissRequest = onSearchCanceled,
-            title = { Text("Add user") },
-            text = {
-                Column {
-                    Text("Search for users by name or email", modifier = Modifier.padding(10.dp))
-                    TextField(
-                        value = searchTerm,
-                        onValueChange = { searchTerm = it },
-                        modifier = Modifier.padding(10.dp),
-                        label = { Text(text = "Search users") }
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (searchTerm.isNotEmpty()) {
-                            onSearchConfirmed(searchTerm)
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "Search field is empty",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                ) {
-                    Text("Add")
-                }
-            },
-            dismissButton = {
-                Button(
-                    onClick = onSearchCanceled
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    @Composable
-    fun AddUserDialog(
-        onAddCanceled: () -> Unit,
-        onAddConfirmed: (String, String, String, String, String) -> Unit
-    ) {
-        var firstNameToAdd by remember { mutableStateOf("") }
-        var lastNameToAdd by remember { mutableStateOf("") }
-        var phoneToAdd by remember { mutableStateOf("") }
-        var emailToAdd by remember { mutableStateOf("") }
-        var ageToAdd by remember { mutableStateOf("") }
-        val context = LocalContext.current
-
-
-        AlertDialog(
-            onDismissRequest = onAddCanceled,
-            title = { Text("Add user") },
-            text = {
-                Column {
-                    Text("Enter the users information", modifier = Modifier.padding(10.dp))
-                    TextField(
-                        value = firstNameToAdd,
-                        onValueChange = { firstNameToAdd = it },
-                        modifier = Modifier.padding(10.dp),
-                        label = { Text(text = "First name") }
-                    )
-                    TextField(
-                        value = lastNameToAdd,
-                        onValueChange = { lastNameToAdd = it },
-                        modifier = Modifier.padding(10.dp),
-                        label = { Text(text = "Last name") }
-                    )
-                    TextField(
-                        value = ageToAdd,
-                        onValueChange = {
-                            if (it.isEmpty() || it.matches(Regex("^\\d+\$"))) {
-                                ageToAdd = it
-                            }
-                                        },
-                        modifier = Modifier.padding(10.dp),
-                        label = { Text(text = "Age") },
-                        keyboardOptions = KeyboardOptions.Default.copy(
-                            keyboardType = KeyboardType.NumberPassword
-                        )
-                    )
-                    TextField(
-                        value = phoneToAdd,
-                        onValueChange = { phoneToAdd = it },
-                        modifier = Modifier.padding(10.dp),
-                        label = { Text(text = "Phone") }
-                    )
-                    TextField(
-                        value = emailToAdd,
-                        onValueChange = { emailToAdd = it },
-                        modifier = Modifier.padding(10.dp),
-                        label = { Text(text = "Email") }
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (firstNameToAdd.isNotEmpty() && lastNameToAdd.isNotEmpty()
-                            && phoneToAdd.isNotEmpty() && emailToAdd.isNotEmpty()) {
-                            onAddConfirmed(firstNameToAdd, lastNameToAdd, ageToAdd, phoneToAdd, emailToAdd)
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "One or more of the fields are empty",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                ) {
-                    Text("Add")
-                }
-            },
-            dismissButton = {
-                Button(
-                    onClick = onAddCanceled
-                ) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
+    /**
+     * Fetches the list of users from the API and updates the UI.
+     *
+     * @param setDone Callback to set the loading status of the UI.
+     * @param setUserList Callback to update the user list in the UI.
+     * @param deletedUsers List of IDs of users that were deleted.
+     * @param addedUsers List of users that were added.
+     * @param editedUsers List of users that were edited.
+     */
     private fun fetchAll(setDone: (Boolean) -> Unit, setUserList: (List<Person>) -> Unit,
                          deletedUsers: List<Int>, addedUsers: List<Person>, editedUsers: List<Person>) {
         thread {
@@ -385,8 +303,10 @@ class MainActivity : ComponentActivity() {
             val myObject: DummyJsonObject = mp.readValue(responseBody, DummyJsonObject::class.java)
             val persons: MutableList<Person>? = myObject.users
             if (persons != null) {
+                // Add the addedUsers to the list
                 persons.addAll(addedUsers)
 
+                // Update the edited users in the list
                 for (editedUser in editedUsers) {
                     val matchingPersonIndex = persons.indexOfFirst { it.id == editedUser.id }
                     if (matchingPersonIndex != -1) {
@@ -394,12 +314,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Remove the deleted users from the list
                 persons.removeIf { it.id in deletedUsers }
+
+                // Update the user list in the UI
                 runOnUiThread {
                     setUserList(persons)
                 }
             }
             response.close()
+
+            // Set the loading status to done in the UI
             runOnUiThread {
                 setDone(true)
             }
@@ -407,10 +332,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Searches for users based on the provided search term and updates the UI.
+     *
+     * @param searchTerm The search term to match against user attributes (e.g., firstName, lastName, email).
+     * @param setUsers Callback to update the user list in the UI.
+     * @param setDone Callback to set the loading status of the UI.
+     * @param deletedUsers List of IDs of users that were deleted.
+     * @param addedUsers List of users that were added.
+     * @param editedUsers List of users that were edited.
+     */
     private fun searchUsers(searchTerm: String, setUsers: (List<Person>) -> Unit, setDone: (Boolean) -> Unit,
                     deletedUsers: List<Int>, addedUsers: List<Person>, editedUsers: List<Person>){
         setDone(false)
         thread {
+            // Searches users from the dummyjson-database,
+            // NOT the local data
             val client = OkHttpClient()
             val request = Request.Builder()
                 .url("https://dummyjson.com/users/search?q=$searchTerm")
@@ -422,6 +359,7 @@ class MainActivity : ComponentActivity() {
             val myObject: DummyJsonObject = mp.readValue(responseBody, DummyJsonObject::class.java)
             val persons: MutableList<Person>? = myObject.users
             if (persons != null) {
+                // Add matching added users to the list
                 addedUsers.forEach{
                     if(it.firstName!!.contains(searchTerm) || it.lastName!!.contains(searchTerm)
                         || it.email!!.contains(searchTerm)) {
@@ -429,12 +367,14 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Remove all edited users from the list
                 persons.removeIf { person ->
                     editedUsers.any { editedUser ->
                         editedUser.id == person.id
                     }
                 }
 
+                // Add back all edited users that match the search term
                 editedUsers.forEach{
                     if(it.firstName!!.contains(searchTerm, ignoreCase = true) || it.lastName!!.contains(searchTerm, ignoreCase = true)
                         || it.email!!.contains(searchTerm, ignoreCase = true)) {
@@ -442,7 +382,9 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Remove deleted users from the list
                 persons.removeIf { it.id in deletedUsers }
+                // Update the user list in the UI
                 runOnUiThread {
                     setUsers(persons)
                 }
@@ -451,6 +393,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
             response.close()
+
+            // Set the loading status to done in the UI
             runOnUiThread {
                 setDone(true)
             }

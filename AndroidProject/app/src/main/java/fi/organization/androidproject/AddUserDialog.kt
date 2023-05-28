@@ -14,31 +14,28 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
-
 /**
- * Displays a dialog for editing a user's information.
+ * Composable function for the search user dialog.
  *
- * @param onEditCanceled Callback triggered when the editing is canceled.
- * @param onDelete Callback triggered when the delete-button is pressed.
- * @param person The Person object representing the user to be edited.
- * @param onEditConfirmed Callback triggered when the editing is confirmed with the updated user information.
+ * @param onAddCanceled Callback when adding user is canceled.
+ * @param onAddConfirmed Callback when adding user is confirmed with a non-empty fields.
  */
 @Composable
-fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: Person, onEditConfirmed: (Int, String, String, String, String, Int) -> Unit){
-
-    // State variables for capturing user input
-    var firstNameToAdd by remember { mutableStateOf(person.firstName!!) }
-    var lastNameToAdd by remember { mutableStateOf(person.lastName!!) }
-    var phoneToAdd by remember { mutableStateOf(person.phone!!) }
-    var emailToAdd by remember { mutableStateOf(person.email!!) }
-    var ageToAdd by remember { mutableStateOf(person.age) }
-
-    var ageInput by remember { mutableStateOf(person.age.toString()) }
+fun AddUserDialog(
+    onAddCanceled: () -> Unit,
+    onAddConfirmed: (String, String, String, String, String) -> Unit
+) {
+    var firstNameToAdd by remember { mutableStateOf("") }
+    var lastNameToAdd by remember { mutableStateOf("") }
+    var phoneToAdd by remember { mutableStateOf("") }
+    var emailToAdd by remember { mutableStateOf("") }
+    var ageToAdd by remember { mutableStateOf("") }
     val context = LocalContext.current
 
+
     AlertDialog(
-        onDismissRequest = onEditCanceled,
-        title = { Text("Edit user") },
+        onDismissRequest = onAddCanceled,
+        title = { Text("Add user") },
         text = {
             Column {
                 Text("Enter the users information", modifier = Modifier.padding(10.dp))
@@ -55,13 +52,12 @@ fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: 
                     label = { Text(text = "Last name") }
                 )
                 TextField(
-                    value = ageInput,
+                    value = ageToAdd,
                     onValueChange = {
-                        ageInput = it
-                        if (it.isEmpty()) {
-                            ageToAdd = 0 // Default value when empty
-                        } else if (it.matches(Regex("^\\d+\$"))) { // only accepts numbers
-                            ageToAdd = it.toInt()
+                        // Doesn't let user put anything other than numbers to
+                        // the age-field
+                        if (it.isEmpty() || it.matches(Regex("^\\d+\$"))) {
+                            ageToAdd = it
                         }
                     },
                     modifier = Modifier.padding(10.dp),
@@ -87,11 +83,9 @@ fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: 
         confirmButton = {
             Button(
                 onClick = {
-                    // Only calls the callback if none of the fields are empty
-                    if(firstNameToAdd.isNotEmpty() && lastNameToAdd.isNotEmpty()
-                        && phoneToAdd.isNotEmpty() && emailToAdd.isNotEmpty()){
-                        onEditConfirmed(person.id,firstNameToAdd, lastNameToAdd, phoneToAdd, emailToAdd, ageToAdd)
-                        onEditCanceled()
+                    if (firstNameToAdd.isNotEmpty() && lastNameToAdd.isNotEmpty()
+                        && phoneToAdd.isNotEmpty() && emailToAdd.isNotEmpty()) {
+                        onAddConfirmed(firstNameToAdd, lastNameToAdd, ageToAdd, phoneToAdd, emailToAdd)
                     } else {
                         Toast.makeText(
                             context,
@@ -101,16 +95,14 @@ fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: 
                     }
                 }
             ) {
-                Text("Edit user")
+                Text("Add")
             }
         },
         dismissButton = {
             Button(
-                onClick = {
-                    onDelete(person.id)
-                }
+                onClick = onAddCanceled
             ) {
-                Text("Delete user")
+                Text("Cancel")
             }
         }
     )

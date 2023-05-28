@@ -17,6 +17,14 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
+/**
+*
+* Composable function that displays a user card with information about a person.
+*
+* @param person The person object containing the user information.
+* @param onDelete Callback function invoked when the user card is deleted.
+* @param onEdit Callback function invoked when the user card is edited.
+*/
 @Composable
 fun UserCard(person: Person, onDelete: (Int) -> Unit ,onEdit: (Int, String, String, String, String, Int) -> Unit) {
     var opened by remember { mutableStateOf(false) }
@@ -36,6 +44,7 @@ fun UserCard(person: Person, onDelete: (Int) -> Unit ,onEdit: (Int, String, Stri
         .height(80.dp)
     ) {
         Row {
+            // Async image in case fetching is done before loading the image
             AsyncImage(
                 model = person.image,
                 contentDescription = null,
@@ -75,5 +84,4 @@ fun UserCard(person: Person, onDelete: (Int) -> Unit ,onEdit: (Int, String, Stri
             }
         }
     }
-
 }
