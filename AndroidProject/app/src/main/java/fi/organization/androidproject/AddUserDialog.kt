@@ -15,7 +15,7 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 
 /**
- * Composable function for the search user dialog.
+ * Composable function for the add user dialog.
  *
  * @param onAddCanceled Callback when adding user is canceled.
  * @param onAddConfirmed Callback when adding user is confirmed with a non-empty fields.
