@@ -25,7 +25,7 @@ fun SearchUserDialog(onSearchCanceled: () -> Unit,onSearchConfirmed: (String) ->
 
     AlertDialog(
         onDismissRequest = onSearchCanceled,
-        title = { Text("Add user") },
+        title = { Text("Search for user") },
         text = {
             Column {
                 Text("Search for users by name or email", modifier = Modifier.padding(10.dp))
@@ -51,7 +51,7 @@ fun SearchUserDialog(onSearchCanceled: () -> Unit,onSearchConfirmed: (String) ->
                     }
                 }
             ) {
-                Text("Add")
+                Text("Search")
             }
         },
         dismissButton = {

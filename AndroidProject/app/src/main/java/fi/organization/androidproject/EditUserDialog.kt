@@ -60,7 +60,7 @@ fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: 
                         ageInput = it
                         if (it.isEmpty()) {
                             ageToAdd = 0 // Default value when empty
-                        } else if (it.matches(Regex("^\\d+\$"))) { // only accepts numbers
+                        } else if (it.matches(Regex("^\\d+\$"))) { // Only accepts numbers
                             ageToAdd = it.toInt()
                         }
                     },
@@ -72,9 +72,16 @@ fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: 
                 )
                 TextField(
                     value = phoneToAdd,
-                    onValueChange = { phoneToAdd = it },
+                    onValueChange = {
+                        if (it.matches(Regex("^[+\\d\\s]+\$"))) { // Only digits, + or space
+                            phoneToAdd = it
+                        }
+                    },
                     modifier = Modifier.padding(10.dp),
-                    label = { Text(text = "Phone") }
+                    label = { Text(text = "Phone") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone
+                    ),
                 )
                 TextField(
                     value = emailToAdd,

@@ -11,7 +11,7 @@ import androidx.compose.material.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 
 /**
@@ -68,9 +68,16 @@ fun AddUserDialog(
                 )
                 TextField(
                     value = phoneToAdd,
-                    onValueChange = { phoneToAdd = it },
+                    onValueChange = {
+                        if (it.matches(Regex("^[+\\d\\s]+\$")) || it.isEmpty()) { // Only digits, + or space
+                            phoneToAdd = it
+                        }
+                    },
                     modifier = Modifier.padding(10.dp),
-                    label = { Text(text = "Phone") }
+                    label = { Text(text = "Phone") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone
+                    ),
                 )
                 TextField(
                     value = emailToAdd,
@@ -107,3 +114,6 @@ fun AddUserDialog(
         }
     )
 }
+
+
+
