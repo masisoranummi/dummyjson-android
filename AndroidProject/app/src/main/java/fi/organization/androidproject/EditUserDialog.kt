@@ -73,7 +73,7 @@ fun EditUserDialog(onEditCanceled: () -> Unit, onDelete: (Int) -> Unit, person: 
                 TextField(
                     value = phoneToAdd,
                     onValueChange = {
-                        if (it.matches(Regex("^[+\\d\\s]+\$"))) { // Only digits, + or space
+                        if (it.matches(Regex("^[+\\d\\s]+\$")) || it.isEmpty()) { // Only digits, + or space
                             phoneToAdd = it
                         }
                     },

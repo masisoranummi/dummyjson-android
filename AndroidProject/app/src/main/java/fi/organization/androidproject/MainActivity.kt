@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * A composable fuction for the main UI for the screen
+     * A composable function for the main UI for the screen
      */
     @Composable
     fun MyScreen() {
