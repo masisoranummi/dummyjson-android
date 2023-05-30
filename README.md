@@ -17,6 +17,6 @@ After pressing the three dots on the user cards, a dialog will appear that will 
 ### Deleting users
 In the same dialog that you can edit users, you can delete that user by pressing the "delete user"-button. You can delete edited and added users and all deletions persist until the activity is closed.
 ## ScreenCast
-placeholder text
+https://www.youtube.com/watch?v=omet3phY7ak (Finnish)
 ## Final thoughts
 I feel much more comfortable with Jetpack Compose after this project, as well as doing http requests and parsing that data. I'm also pretty happy with how the UI turned out, I managed to smooth out most of the rough edges in the project. There are some things I still left undone due to difficulty or laziness. The edited/deleted/added users being saved if the instance was closed (but not destroyed) was one of those features, but I felt like adding that was way more complicated than I was initially expecting, so I left that undone. Overall, I give it a pretty good/10.
